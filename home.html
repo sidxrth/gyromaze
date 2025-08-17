@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dark Maze - Tilt to Escape</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: radial-gradient(circle at center, #1a1a2e, #0f0f1e);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            color: #00ff88;
+        }
+
+        #ui-container {
+            width: 90vmin;
+            max-width: 500px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+            margin-bottom: 10px;
+        }
+
+        #gameContainer {
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 500px;
+            max-height: 500px;
+            position: relative;
+            border: 3px solid #00ff88;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #000011;
+            box-shadow:
+                0 0 30px rgba(0, 255, 136, 0.3),
+                inset 0 0 30px rgba(0, 255, 136, 0.1);
+        }
+
+        #maze {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #000011;
+        }
+
+        .wall {
+            position: absolute;
+            background: linear-gradient(45deg, #2a2a4a, #1a1a3a);
+            border: 1px solid #00ff88;
+            box-shadow:
+                0 0 10px rgba(0, 255, 136, 0.2),
+                inset 0 0 5px rgba(0, 255, 136, 0.1);
+        }
+
+        .player {
+            position: absolute;
+            background: radial-gradient(circle at 30% 30%, #00ffff, #0088ff);
+            border-radius: 50%;
+            transition: none;
+            z-index: 100;
+            box-shadow:
+                0 0 15px rgba(0, 255, 255, 0.8),
+                0 0 30px rgba(0, 255, 255, 0.4),
+                inset 0 0 8px rgba(255, 255, 255, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow:
+                    0 0 15px rgba(0, 255, 255, 0.8),
+                    0 0 30px rgba(0, 255, 255, 0.4),
+                    inset 0 0 8px rgba(255, 255, 255, 0.3);
+            }
+            50% {
+                box-shadow:
+                    0 0 20px rgba(0, 255, 255, 1),
+                    0 0 40px rgba(0, 255, 255, 0.6),
+                    inset 0 0 10px rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        .goal {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at 30% 30%, #ff0080, #ff0040);
+            border-radius: 50%;
+            z-index: 50;
+            animation: goal-pulse 1.5s ease-in-out infinite;
+            box-shadow:
+                0 0 20px rgba(255, 0, 128, 0.9),
+                0 0 40px rgba(255, 0, 128, 0.5);
+        }
+
+        @keyframes goal-pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow:
+                    0 0 20px rgba(255, 0, 128, 0.9),
+                    0 0 40px rgba(255, 0, 128, 0.5);
+            }
+            50% {
+                transform: scale(1.2);
+                box-shadow:
+                    0 0 25px rgba(255, 0, 128, 1),
+                    0 0 50px rgba(255, 0, 128, 0.7);
+            }
+        }
+
+        .trail {
+            position: absolute;
+            background: rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: fade-trail 2s ease-out forwards;
+        }
+
+        @keyframes fade-trail {
+            0% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.3); }
+        }
+
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            background: rgba(0, 0, 17, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+            z-index: 300;
+            max-width: 80%;
+        }
+
+        #success, #fail {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(0, 0, 17, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #ff0080;
+            box-shadow: 0 0 50px rgba(255, 0, 128, 0.5);
+            display: none;
+            z-index: 300;
+            color: #ff0080;
+            text-shadow: 0 0 15px rgba(255, 0, 128, 0.8);
+        }
+
+        #fail {
+            border-color: #ff0000;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.5);
+            color: #ff0000;
+            text-shadow: 0 0 15px rgba(255, 0, 0, 0.8);
+        }
+
+        button {
+            background: linear-gradient(45deg, #00ff88, #00cc66);
+            border: none;
+            padding: 12px 24px;
+            margin: 10px;
+            border-radius: 10px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
+            transition: all 0.2s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 255, 136, 0.4);
+        }
+
+        .permission-btn {
+            background: linear-gradient(45deg, #ff8800, #ff6600);
+            color: white;
+        }
+
+        #tiltIndicator {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            opacity: 0.7;
+            text-align: center;
+            display: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: #00ffff;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particle-rise 3s ease-out forwards;
+        }
+
+        @keyframes particle-rise {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-100px) scale(0); }
+        }
+
+        .glow-effect {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.1), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: glow-expand 1s ease-out forwards;
+        }
+
+        @keyframes glow-expand {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        .level-indicator {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+
+        @media (max-width: 600px) {
+            #ui-container { font-size: 14px; }
+            #instructions { font-size: 16px; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-container">
+        <div class="level-indicator">Level: <span id="level">1</span></div>
+        <div class="level-indicator">Time: <span id="timer">00:00</span></div>
+        <div class="level-indicator">Best: <span id="bestTime">--:--</span></div>
+    </div>
+    <div id="gameContainer">
+        <div id="maze"></div>
+        
+        <div id="instructions">
+            <h3 style="color: #00ff88; margin-bottom: 20px;">DARK MAZE ESCAPE</h3>
+            <p style="margin-bottom: 15px;">Tilt your device to guide the glowing orb through the darkness</p>
+            <p style="margin-bottom: 20px; font-size: 14px; opacity: 0.8;">
+                Mobile: Tilt device to move<br>
+                Desktop: Use arrow keys or WASD
+            </p>
+            <button onclick="requestPermissions()" class="permission-btn">Enable Motion Controls</button>
+            <button onclick="startGame()">Start Game</button>
+        </div>
+        
+        <div id="success">
+            <h2 style="margin-bottom: 20px;">LEVEL COMPLETE!</h2>
+            <div style="margin-bottom: 20px;">
+                <div>Time: <span id="completionTime">00:00</span></div>
+                <div id="newRecord" style="color: #ffff00; margin-top: 10px; display: none;">NEW RECORD!</div>
+            </div>
+            <button onclick="nextLevel()">Next Level</button>
+            <button onclick="restartLevel()">Restart Level</button>
+        </div>
+        
+        <div id="fail">
+            <h2 style="margin-bottom: 20px;">GAME OVER</h2>
+            <p style="margin-bottom: 20px;">You ran out of time!</p>
+            <button onclick="restartLevel()">Restart Level</button>
+        </div>
+        
+        <div class="player" id="player"></div>
+        <div class="goal" id="goal"></div>
+        
+        <div id="tiltIndicator">
+            Tilt: X <span id="tiltX">0</span>° | Y <span id="tiltY">0</span>°
+        </div>
+    </div>
+
+    <script>
+        class DarkMaze {
+            constructor() {
+                this.maze = document.getElementById('maze');
+                this.player = document.getElementById('player');
+                this.goal = document.getElementById('goal');
+                this.levelEl = document.getElementById('level');
+                this.timerEl = document.getElementById('timer');
+                this.bestTimeEl = document.getElementById('bestTime');
+                this.instructions = document.getElementById('instructions');
+                this.successEl = document.getElementById('success');
+                this.failEl = document.getElementById('fail');
+
+                this.level = 1;
+                this.playerX = 0;
+                this.playerY = 0;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.gameStarted = false;
+                this.levelStartTime = 0;
+                this.gameTime = 0;
+                this.bestTimes = JSON.parse(localStorage.getItem('mazeBestTimes') || '{}');
+
+                this.mazeSize = 25;
+                this.cellSize = 0;
+                this.playerSize = 0;
+                this.playerRadius = 0;
+                this.walls = [];
+
+                this.tiltX = 0;
+                this.tiltY = 0;
+                this.permissionGranted = false;
+                this.isMobile = /Mobi|Android/i.test(navigator.userAgent);
+                this.keys = {};
+
+                this.maxMazeSize = 101;
+                this.minMazeSize = 15;
+                this.maxGameTime = 150000;
+
+                // New physics parameters for a smoother feel
+                this.acceleration = 0.3;
+                this.friction = 0.95;
+                this.maxVelocity = 4.0;
+
+                this.init();
+            }
+
+            init() {
+                this.resizeMaze();
+                window.addEventListener('resize', () => this.resizeMaze());
+                this.bindEvents();
+                this.updateBestTime();
+                this.generateMaze();
+
+                if (!this.isMobile) {
+                    document.querySelector('.permission-btn').style.display = 'none';
+                    document.getElementById('instructions').querySelector('p:nth-of-type(1)').textContent = 'Use arrow keys or WASD to guide the glowing orb through the darkness.';
+                    document.getElementById('instructions').querySelector('p:nth-of-type(2)').style.display = 'none';
+                }
+            }
+
+            resizeMaze() {
+                this.cellSize = Math.min(
+                    this.maze.offsetWidth / this.mazeSize,
+                    this.maze.offsetHeight / this.mazeSize
+                ) || 16;
+                
+                this.playerSize = this.cellSize * 0.7;
+                this.playerRadius = this.playerSize / 2;
+            }
+
+            bindEvents() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+
+                // REFINED GYRO CONTROL
+                const gyroDeadzone = 1.5;
+
+                window.addEventListener('deviceorientation', (e) => {
+                    if (!this.permissionGranted) return;
+
+                    const gamma = e.gamma || 0;
+                    const beta = e.beta || 0;
+
+                    const clampedX = Math.max(-45, Math.min(45, gamma));
+                    const clampedY = Math.max(-45, Math.min(45, beta));
+
+                    this.tiltX = Math.abs(clampedX) > gyroDeadzone ? clampedX : 0;
+                    this.tiltY = Math.abs(clampedY) > gyroDeadzone ? clampedY : 0;
+
+                    document.getElementById('tiltX').textContent = this.tiltX.toFixed(2);
+                    document.getElementById('tiltY').textContent = this.tiltY.toFixed(2);
+                });
+            }
+
+            createConnectedMaze() {
+                const maze = Array(this.mazeSize).fill().map(() => Array(this.mazeSize).fill(1));
+                const stack = [];
+
+                const pickOdd = (max) => {
+                    let v = Math.floor(Math.random() * ((max - 1) / 2)) * 2 + 1;
+                    if (v < 1) v = 1;
+                    if (v > max - 2) v = max - 2;
+                    return v;
+                };
+
+                const startX = pickOdd(this.mazeSize);
+                const startY = pickOdd(this.mazeSize);
+
+                maze[startY][startX] = 0;
+                stack.push([startX, startY]);
+
+                const directions = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+
+                while (stack.length > 0) {
+                    const [x, y] = stack[stack.length - 1];
+                    const neighbors = [];
+
+                    for (const [dx, dy] of directions) {
+                        const nx = x + dx, ny = y + dy;
+                        if (nx > 0 && nx < this.mazeSize - 1 && ny > 0 && ny < this.mazeSize - 1 && maze[ny][nx] === 1) {
+                            neighbors.push([nx, ny, x + dx / 2, y + dy / 2]);
+                        }
+                    }
+
+                    if (neighbors.length > 0) {
+                        const [nx, ny, wallX, wallY] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        maze[ny][nx] = 0;
+                        maze[wallY][wallX] = 0;
+                        stack.push([nx, ny]);
+                    } else {
+                        stack.pop();
+                    }
+                }
+
+                const extra = Math.floor((this.mazeSize * this.mazeSize) * 0.05 * Math.min(1, this.level / 10));
+                for (let i = 0; i < extra; i++) {
+                    const x = Math.floor(Math.random() * (this.mazeSize - 2)) + 1;
+                    const y = Math.floor(Math.random() * (this.mazeSize - 2)) + 1;
+                    let neighbors = 0;
+                    if (y > 0 && maze[y-1][x] === 0) neighbors++;
+                    if (y < this.mazeSize-1 && maze[y+1][x] === 0) neighbors++;
+                    if (x > 0 && maze[y][x-1] === 0) neighbors++;
+                    if (x < this.mazeSize-1 && maze[y][x+1] === 0) neighbors++;
+                    if (neighbors >= 2) maze[y][x] = 0;
+                }
+
+                const start = { x: startX, y: startY };
+                const visited = Array(this.mazeSize).fill().map(() => Array(this.mazeSize).fill(false));
+                const dist = Array(this.mazeSize).fill().map(() => Array(this.mazeSize).fill(Infinity));
+                const q = [];
+                visited[startY][startX] = true;
+                dist[startY][startX] = 0;
+                q.push([startX, startY]);
+
+                const reachable = [];
+                while (q.length) {
+                    const [cx, cy] = q.shift();
+                    reachable.push({ x: cx, y: cy, d: dist[cy][cx] });
+                    const nbs = [[1,0],[-1,0],[0,1],[0,-1]];
+                    for (const [dx,dy] of nbs) {
+                        const nx = cx + dx, ny = cy + dy;
+                        if (nx >= 0 && nx < this.mazeSize && ny >= 0 && ny < this.mazeSize && !visited[ny][nx] && maze[ny][nx] === 0) {
+                            visited[ny][nx] = true;
+                            dist[ny][nx] = dist[cy][cx] + 1;
+                            q.push([nx, ny]);
+                        }
+                    }
+                }
+
+                let goal;
+                if (reachable.length > 0) {
+                    reachable.sort((a,b) => b.d - a.d);
+                    const threshold = Math.floor(this.mazeSize / 2);
+                    goal = reachable.find(r => r.d >= threshold) || reachable[0];
+                } else {
+                    const openSpaces = [];
+                    for (let y = 1; y < this.mazeSize - 1; y++) {
+                        for (let x = 1; x < this.mazeSize - 1; x++) {
+                            if (maze[y][x] === 0) openSpaces.push({x,y});
+                        }
+                    }
+                    if (openSpaces.length === 0) {
+                        maze[startY][Math.min(startX+1, this.mazeSize-2)] = 0;
+                        goal = { x: Math.min(startX+1, this.mazeSize-2), y: startY, d: 1 };
+                    } else {
+                        goal = openSpaces[Math.floor(Math.random() * openSpaces.length)];
+                    }
+                }
+
+                return { maze, start: { x: start.x, y: start.y }, goal: { x: goal.x, y: goal.y } };
+            }
+
+            generateMaze() {
+                this.resizeMaze();
+                if (this.mazeSize % 2 === 0) this.mazeSize++;
+                if (this.mazeSize < this.minMazeSize) this.mazeSize = this.minMazeSize;
+                if (this.mazeSize > this.maxMazeSize) this.mazeSize = this.maxMazeSize;
+                this.walls = [];
+                this.maze.innerHTML = '';
+                const result = this.createConnectedMaze();
+                const maze = result.maze;
+                const startPos = result.start;
+                const goalPos = result.goal;
+                for (let y = 0; y < this.mazeSize; y++) {
+                    for (let x = 0; x < this.mazeSize; x++) {
+                        if (maze[y][x] === 1) {
+                            this.createWall(x * this.cellSize, y * this.cellSize);
+                        }
+                    }
+                }
+                this.player.style.width = `${this.playerSize}px`;
+                this.player.style.height = `${this.playerSize}px`;
+                this.playerX = (startPos.x + 0.5) * this.cellSize;
+                this.playerY = (startPos.y + 0.5) * this.cellSize;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                const goalSize = 20;
+                this.goal.style.left = `${(goalPos.x + 0.5) * this.cellSize - goalSize / 2}px`;
+                this.goal.style.top = `${(goalPos.y + 0.5) * this.cellSize - goalSize / 2}px`;
+                this.updatePlayerPosition();
+            }
+
+            createWall(x, y) {
+                const wall = document.createElement('div');
+                wall.className = 'wall';
+                wall.style.left = `${x}px`;
+                wall.style.top = `${y}px`;
+                wall.style.width = `${this.cellSize}px`;
+                wall.style.height = `${this.cellSize}px`;
+                this.maze.appendChild(wall);
+                this.walls.push({ x, y, width: this.cellSize, height: this.cellSize });
+            }
+
+            update() {
+                if (!this.gameStarted) return;
+                this.gameTime = Date.now() - this.levelStartTime;
+                this.updateTimer();
+                if (this.gameTime >= this.maxGameTime) {
+                    this.failLevel();
+                    return;
+                }
+                let accelX = 0, accelY = 0;
+                if (this.permissionGranted) {
+                    accelX = this.tiltX;
+                    accelY = this.tiltY;
+                } else {
+                    if (this.keys['a'] || this.keys['arrowleft']) accelX = -45;
+                    if (this.keys['d'] || this.keys['arrowright']) accelX = 45;
+                    if (this.keys['w'] || this.keys['arrowup']) accelY = -45;
+                    if (this.keys['s'] || this.keys['arrowdown']) accelY = 45;
+                }
+                
+                this.velocityX += accelX * this.acceleration * (1 / 60);
+                this.velocityY += accelY * this.acceleration * (1 / 60);
+                this.velocityX *= this.friction;
+                this.velocityY *= this.friction;
+                this.velocityX = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.velocityX));
+                this.velocityY = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.velocityY));
+                const newX = this.playerX + this.velocityX;
+                const newY = this.playerY + this.velocityY;
+                if (!this.checkWallCollision(newX, this.playerY)) {
+                    this.playerX = newX;
+                } else {
+                    this.velocityX = -this.velocityX * 0.5;
+                }
+                if (!this.checkWallCollision(this.playerX, newY)) {
+                    this.playerY = newY;
+                } else {
+                    this.velocityY = -this.velocityY * 0.5;
+                }
+                this.playerX = Math.max(this.playerRadius, Math.min(this.maze.offsetWidth - this.playerRadius, this.playerX));
+                this.playerY = Math.max(this.playerRadius, Math.min(this.maze.offsetHeight - this.playerRadius, this.playerY));
+                this.updatePlayerPosition();
+                this.checkGoalCollision();
+                this.createTrail();
+                this.createParticles();
+            }
+
+            checkWallCollision(x, y) {
+                for (const wall of this.walls) {
+                    if (x + this.playerRadius > wall.x &&
+                        x - this.playerRadius < wall.x + wall.width &&
+                        y + this.playerRadius > wall.y &&
+                        y - this.playerRadius < wall.y + wall.height) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            checkGoalCollision() {
+                const goalRect = this.goal.getBoundingClientRect();
+                const playerRect = this.player.getBoundingClientRect();
+                const goalCx = goalRect.left + goalRect.width/2;
+                const goalCy = goalRect.top + goalRect.height/2;
+                const playerCx = playerRect.left + playerRect.width/2;
+                const playerCy = playerRect.top + playerRect.height/2;
+                const distance = Math.sqrt(
+                    Math.pow(goalCx - playerCx, 2) +
+                    Math.pow(goalCy - playerCy, 2)
+                );
+                if (distance < 20) {
+                    this.completeLevel();
+                }
+            }
+
+            completeLevel() {
+                this.gameStarted = false;
+                const completionTimeMs = this.gameTime;
+                const completionTime = this.formatTime(completionTimeMs);
+                document.getElementById('completionTime').textContent = completionTime;
+                const levelKey = String(this.level);
+                const currentBest = this.bestTimes[levelKey];
+                if (!currentBest || completionTimeMs < currentBest) {
+                    this.bestTimes[levelKey] = completionTimeMs;
+                    localStorage.setItem('mazeBestTimes', JSON.stringify(this.bestTimes));
+                    document.getElementById('newRecord').style.display = 'block';
+                    this.updateBestTime();
+                } else {
+                    document.getElementById('newRecord').style.display = 'none';
+                }
+                this.successEl.style.display = 'block';
+                this.createSuccessEffect();
+            }
+
+            failLevel() {
+                this.gameStarted = false;
+                this.failEl.style.display = 'block';
+            }
+
+            createSuccessEffect() {
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        const glow = document.createElement('div');
+                        glow.className = 'glow-effect';
+                        glow.style.left = `${this.playerX - this.playerSize}px`;
+                        glow.style.top = `${this.playerY - this.playerSize}px`;
+                        this.maze.appendChild(glow);
+                        setTimeout(() => glow.remove(), 1000);
+                    }, i * 50);
+                }
+            }
+
+            createTrail() {
+                if (Math.random() > 0.8 && (Math.abs(this.velocityX) > 0.5 || Math.abs(this.velocityY) > 0.5)) {
+                    const trail = document.createElement('div');
+                    trail.className = 'trail';
+                    const trailSize = this.playerSize * 0.4;
+                    trail.style.width = `${trailSize}px`;
+                    trail.style.height = `${trailSize}px`;
+                    trail.style.left = `${this.playerX - this.playerRadius + (Math.random() - 0.5) * this.playerSize}px`;
+                    trail.style.top = `${this.playerY - this.playerRadius + (Math.random() - 0.5) * this.playerSize}px`;
+                    this.maze.appendChild(trail);
+                    setTimeout(() => trail.remove(), 2000);
+                }
+            }
+
+            createParticles() {
+                if (Math.random() > 0.95) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    const particleSize = this.playerSize * 0.2;
+                    particle.style.width = `${particleSize}px`;
+                    particle.style.height = `${particleSize}px`;
+                    particle.style.left = `${this.playerX - this.playerRadius + (Math.random() - 0.5) * this.playerSize}px`;
+                    particle.style.top = `${this.playerY - this.playerRadius + (Math.random() - 0.5) * this.playerSize}px`;
+                    this.maze.appendChild(particle);
+                    setTimeout(() => particle.remove(), 3000);
+                }
+            }
+
+            updatePlayerPosition() {
+                this.player.style.left = `${this.playerX - this.playerRadius}px`;
+                this.player.style.top = `${this.playerY - this.playerRadius}px`;
+            }
+
+            updateTimer() {
+                const remainingTimeMs = this.maxGameTime - this.gameTime;
+                this.timerEl.textContent = this.formatTime(Math.max(0, remainingTimeMs));
+            }
+
+            updateBestTime() {
+                const best = this.bestTimes[String(this.level)];
+                this.bestTimeEl.textContent = best ? this.formatTime(best) : '--:--';
+            }
+
+            formatTime(ms) {
+                const seconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(seconds / 60);
+                return `${minutes.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+            }
+
+            nextLevel() {
+                this.level++;
+                this.levelEl.textContent = this.level;
+                const increase = Math.min(4, Math.floor(1 + this.level / 3));
+                this.mazeSize = Math.min(this.maxMazeSize, this.mazeSize + increase);
+                if (this.mazeSize % 2 === 0) this.mazeSize++;
+                this.successEl.style.display = 'none';
+                this.updateBestTime();
+                this.startLevel();
+            }
+
+            restartLevel() {
+                this.successEl.style.display = 'none';
+                this.failEl.style.display = 'none';
+                this.startLevel();
+            }
+
+            startLevel() {
+                this.gameStarted = true;
+                this.levelStartTime = Date.now();
+                this.gameTime = 0;
+                this.generateMaze();
+            }
+
+            gameLoop() {
+                this.update();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+
+        function random(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        let game;
+
+        async function requestPermissions() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        game.permissionGranted = true;
+                        document.querySelector('.permission-btn').textContent = 'Motion Enabled ✅';
+                        document.querySelector('.permission-btn').style.background = 'linear-gradient(45deg, #00ff88, #00cc66)';
+                        document.getElementById('tiltIndicator').style.display = 'block';
+                    } else {
+                        alert('Motion permission denied — keyboard controls still available.');
+                    }
+                } catch (error) {
+                    console.log('Permission request failed:', error);
+                    alert('Motion permission request failed — keyboard controls still available.');
+                }
+            } else {
+                if (game.isMobile) {
+                    game.permissionGranted = true;
+                    document.querySelector('.permission-btn').textContent = 'Motion Enabled ✅';
+                    document.querySelector('.permission-btn').style.background = 'linear-gradient(45deg, #00ff88, #00cc66)';
+                    document.getElementById('tiltIndicator').style.display = 'block';
+                    window.addEventListener('deviceorientation', () => {});
+                } else {
+                    alert('This browser does not support motion controls or explicit permission requests.');
+                }
+            }
+        }
+
+        function startGame() {
+            document.getElementById('instructions').style.display = 'none';
+            if (!game.gameStarted) game.startLevel();
+        }
+
+        function nextLevel() {
+            game.nextLevel();
+        }
+
+        function restartLevel() {
+            game.restartLevel();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new DarkMaze();
+            game.gameLoop();
+        });
+    </script>
+</body>
+</html>
