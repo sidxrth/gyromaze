@@ -1,1 +1,1 @@
-y
+a simple maze game
